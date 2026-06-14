@@ -1,10 +1,9 @@
 """
 Heart Failure — Sistema de Classificação de Risco
-===================================================
 Dataset : heart_failure_clinical_records_dataset.csv
           https://archive.ics.uci.edu/dataset/519/heart+failure+clinical+records
-Modelos : Random Forest, Gradient Boosting, Regressão Logística
-Autor   : Rebecca
+Modelo  : Random Forest
+Aluna   : Rebecca
 """
 
 import pandas as pd
@@ -13,8 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score, classification_report,
     confusion_matrix, roc_auc_score,
@@ -28,9 +26,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-# ============================================================
-# CARREGAMENTO E PRÉ-PROCESSAMENTO
-# ============================================================
+#carregamento e pré-processamento
 
 print("=" * 60)
 print("  HEART FAILURE — SISTEMA DE CLASSIFICAÇÃO DE RISCO")
@@ -46,9 +42,7 @@ print(df.info())
 print("\nEstatísticas descritivas:")
 print(df.describe())
 
-# ============================================================
-# ANÁLISE DAS COLUNAS BINÁRIAS
-# ============================================================
+#análise de colunas binárias
 
 # O dataset possui colunas binárias (0/1) que representam
 # categorias e NÃO devem ser normalizadas pelo StandardScaler,
@@ -56,21 +50,21 @@ print(df.describe())
 # seu significado semântico (ex: anaemia = 0 ou 1).
 #
 # Colunas binárias identificadas:
-#   - anaemia         (0 = não, 1 = sim)
-#   - diabetes        (0 = não, 1 = sim)
+#   - anaemia             (0 = não, 1 = sim)
+#   - diabetes            (0 = não, 1 = sim)
 #   - high_blood_pressure (0 = não, 1 = sim)
-#   - sex             (0 = feminino, 1 = masculino)
-#   - smoking         (0 = não, 1 = sim)
+#   - sex                 (0 = feminino, 1 = masculino)
+#   - smoking             (0 = não, 1 = sim)
 #
-# Estratégia: escalonar APENAS as colunas contínuas.
+# Estratégia foi escalonar APENAS as colunas contínuas.
 
 colunas_binarias  = ['anaemia', 'diabetes', 'high_blood_pressure', 'sex', 'smoking']
 colunas_continuas = ['age', 'creatinine_phosphokinase', 'ejection_fraction',
                      'platelets', 'serum_creatinine', 'serum_sodium', 'time']
 
-print(f"\n### COLUNAS BINÁRIAS (não serão normalizadas) ###")
+print(f"\n--- COLUNAS BINÁRIAS (não serão normalizadas) ---")
 print(colunas_binarias)
-print(f"\n### COLUNAS CONTÍNUAS (serão normalizadas) ###")
+print(f"\n--- COLUNAS CONTÍNUAS (serão normalizadas) ---")
 print(colunas_continuas)
 
 # Verificar valores nulos
@@ -81,28 +75,21 @@ print(f"\nDistribuição da classe (DEATH_EVENT):")
 print(df['DEATH_EVENT'].value_counts())
 print(df['DEATH_EVENT'].value_counts(normalize=True).map(lambda x: f"{x:.1%}"))
 
-# ============================================================
-# SEPARAÇÃO DE ATRIBUTOS E TARGET
-# ============================================================
+#separação de atributos e target
 
 X = df.drop(columns=['DEATH_EVENT'])
 y = df['DEATH_EVENT']
 
-# ============================================================
-# PRÉ-PROCESSAMENTO — ESCALONAMENTO SELETIVO
-# ============================================================
+#pré-processamento e escalonamento seletivo
 
-# Fit do scaler apenas nas colunas contínuas
 scaler = StandardScaler()
 X_processado = X.copy()
 X_processado[colunas_continuas] = scaler.fit_transform(X[colunas_continuas])
 
-print(f"\n### DADOS APÓS PRÉ-PROCESSAMENTO ###")
+print(f"\n--- DADOS APÓS PRÉ-PROCESSAMENTO ---")
 print(X_processado.describe().round(3))
 
-# ============================================================
-# DIVISÃO TREINO / TESTE
-# ============================================================
+# divisao de treino/teste
 
 print(f"\n### FREQUÊNCIA DAS CLASSES ###")
 pprint(dict(Counter(y)))
@@ -114,246 +101,133 @@ X_train, X_test, y_train, y_test = train_test_split(
 print(f"\nTreino : {X_train.shape[0]} amostras")
 print(f"Teste  : {X_test.shape[0]} amostras")
 
-# ============================================================
-# DEFINIÇÃO DOS MODELOS
-# ============================================================
+# definição e treinamento do modelo
 
-modelos = {
-    "Random Forest": RandomForestClassifier(
-        n_estimators=200,
-        max_depth=10,
-        class_weight='balanced',
-        random_state=42,
-        n_jobs=-1
-    ),
-    "Gradient Boosting": GradientBoostingClassifier(
-        n_estimators=150,
-        learning_rate=0.05,
-        max_depth=4,
-        random_state=42
-    ),
-    "Regressão Logística": LogisticRegression(
-        max_iter=1000,
-        class_weight='balanced',
-        random_state=42
-    ),
-}
+# Metaestimador escolhido: Random Forest
+# Justificativa: algoritmo ensemble baseado em múltiplas árvores
+# de decisão, robusto para datasets pequenos (299 pacientes),
+# lida bem com o mix de variáveis binárias e contínuas sem
+# distorcer o significado semântico das binárias, e o parâmetro
+# class_weight='balanced' compensa o desbalanceamento entre
+# pacientes que sobreviveram e que foram a óbito.
+
+modelo = RandomForestClassifier(
+    n_estimators=200,
+    max_depth=10,
+    class_weight='balanced',
+    random_state=42,
+    n_jobs=-1
+)
 
 cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
 
-# ============================================================
-# TREINAMENTO E AVALIAÇÃO
-# ============================================================
-
-resultados = {}
-
 print("\n" + "=" * 60)
-for nome, modelo in modelos.items():
-    print(f"\n{'─' * 40}")
-    print(f"  Treinando: {nome}")
-    print(f"{'─' * 40}")
-
-    # Validação cruzada
-    cv_scores = cross_val_score(modelo, X_train, y_train, cv=cv, scoring='accuracy')
-
-    # Treino final
-    modelo.fit(X_train, y_train)
-    y_pred   = modelo.predict(X_test)
-    y_proba  = modelo.predict_proba(X_test)[:, 1]
-
-    # Métricas
-    acc  = accuracy_score(y_test, y_pred)
-    prec = precision_score(y_test, y_pred)
-    rec  = recall_score(y_test, y_pred)
-    f1   = f1_score(y_test, y_pred)
-    auc  = roc_auc_score(y_test, y_proba)
-    cm   = confusion_matrix(y_test, y_pred)
-
-    # Especificidade e sensibilidade
-    tn, fp, fn, tp = cm.ravel()
-    especificidade = tn / (tn + fp)
-    sensibilidade  = tp / (tp + fn)
-
-    resultados[nome] = {
-        'cv_mean':        cv_scores.mean(),
-        'cv_std':         cv_scores.std(),
-        'accuracy':       acc,
-        'precision':      prec,
-        'recall':         rec,
-        'f1':             f1,
-        'roc_auc':        auc,
-        'especificidade': especificidade,
-        'sensibilidade':  sensibilidade,
-        'cm':             cm,
-        'y_pred':         y_pred,
-        'y_proba':        y_proba,
-        'modelo':         modelo,
-    }
-
-    print(f"  CV Accuracy (10-fold) : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
-    print(f"  Acurácia (teste)      : {acc:.4f}")
-    print(f"  Precision             : {prec:.4f}")
-    print(f"  Recall                : {rec:.4f}")
-    print(f"  F1-Score              : {f1:.4f}")
-    print(f"  ROC-AUC               : {auc:.4f}")
-    print(f"  Especificidade        : {especificidade:.4f}")
-    print(f"  Sensibilidade         : {sensibilidade:.4f}")
-    print(f"\n  Matriz de Confusão:\n{cm}")
-    print(f"\n  Relatório completo:")
-    print(classification_report(y_test, y_pred,
-                                target_names=['Sobreviveu', 'Faleceu']))
-
-# ============================================================
-# SELEÇÃO DO MELHOR MODELO
-# ============================================================
-
-print("\n" + "=" * 60)
-print("  SELEÇÃO DO MELHOR MODELO")
+print(f"  Treinando: Random Forest")
 print("=" * 60)
 
-melhor_nome = max(resultados, key=lambda n: resultados[n]['roc_auc'])
-melhor      = resultados[melhor_nome]
+# Validação cruzada
+cv_scores = cross_val_score(modelo, X_train, y_train, cv=cv, scoring='accuracy')
 
-print(f"\n  Modelo selecionado: {melhor_nome}")
-print(f"  ROC-AUC            : {melhor['roc_auc']:.4f}")
-print(f"  F1-Score           : {melhor['f1']:.4f}")
-print(f"  Sensibilidade      : {melhor['sensibilidade']:.4f}")
-print(f"  Especificidade     : {melhor['especificidade']:.4f}")
+# Treino final
+modelo.fit(X_train, y_train)
+y_pred  = modelo.predict(X_test)
+y_proba = modelo.predict_proba(X_test)[:, 1]
 
-print(f"""
-  Justificativa:
-  O metaestimador {melhor_nome} foi selecionado por apresentar
-  o melhor ROC-AUC, que mede a capacidade do modelo de separar
-  pacientes sobreviventes de pacientes em risco de óbito.
+# Métricas
+acc  = accuracy_score(y_test, y_pred)
+prec = precision_score(y_test, y_pred)
+rec  = recall_score(y_test, y_pred)
+f1   = f1_score(y_test, y_pred)
+auc  = roc_auc_score(y_test, y_proba)
+cm   = confusion_matrix(y_test, y_pred)
 
-  Em contexto clínico, falsos negativos (classificar como
-  saudável um paciente que vai a óbito) são mais custosos
-  que falsos positivos. Por isso, além do ROC-AUC, a
-  sensibilidade é uma métrica crítica neste problema.
+tn, fp, fn, tp = cm.ravel()
+especificidade = tn / (tn + fp)
+sensibilidade  = tp / (tp + fn)
 
-  O tratamento diferenciado das variáveis binárias (anaemia,
-  diabetes, high_blood_pressure, sex, smoking) — mantidas em
-  sua escala original 0/1 sem normalização — preserva seu
-  significado semântico e evita distorções no aprendizado.
-""")
+print(f"  CV Accuracy (10-fold) : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+print(f"  Acurácia (teste)      : {acc:.4f}")
+print(f"  Precision             : {prec:.4f}")
+print(f"  Recall                : {rec:.4f}")
+print(f"  F1-Score              : {f1:.4f}")
+print(f"  ROC-AUC               : {auc:.4f}")
+print(f"  Especificidade        : {especificidade:.4f}")
+print(f"  Sensibilidade         : {sensibilidade:.4f}")
+print(f"\n  Matriz de Confusão:\n{cm}")
+print(f"\n  Relatório completo:")
+print(classification_report(y_test, y_pred, target_names=['Sobreviveu', 'Faleceu']))
 
-# ============================================================
-# SALVANDO MELHOR MODELO E SCALER
-# ============================================================
+#salvando modelo e scaler
 
-dump(resultados[melhor_nome]['modelo'], open('melhor_modelo_hf.pkl', 'wb'))
-dump(scaler,                            open('scaler_hf.pkl', 'wb'))
+dump(modelo,  open('melhor_modelo_hf.pkl', 'wb'))
+dump(scaler,  open('scaler_hf.pkl', 'wb'))
 
 print(f"  Modelo salvo em: melhor_modelo_hf.pkl")
 print(f"  Scaler salvo em: scaler_hf.pkl")
 
-# ============================================================
-# VISUALIZAÇÕES
-# ============================================================
+# visualizações
 
-nomes    = list(resultados.keys())
-cores    = ['#f4a7b9', '#b5d5f5', '#c3e6cb']
-metricas = ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']
-labels   = ['Acurácia', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC']
-
-fig = plt.figure(figsize=(15, 9))
+fig = plt.figure(figsize=(14, 5))
 fig.patch.set_facecolor('#0f0f0f')
-gs  = gridspec.GridSpec(2, 3, figure=fig, hspace=0.45, wspace=0.35)
+gs  = gridspec.GridSpec(1, 3, figure=fig, hspace=0.4, wspace=0.4)
 
-# Gráfico de barras agrupadas
-ax1 = fig.add_subplot(gs[0, :2])
+# Métricas em barras
+ax1 = fig.add_subplot(gs[0, 0])
 ax1.set_facecolor('#1a1a1a')
-x = np.arange(len(metricas))
-w = 0.25
-
-for i, (nome, cor) in enumerate(zip(nomes, cores)):
-    vals = [resultados[nome][m] for m in metricas]
-    bars = ax1.bar(x + i * w, vals, width=w, label=nome, color=cor, alpha=0.85, zorder=3)
-    for bar, val in zip(bars, vals):
-        ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.005,
-                 f'{val:.2f}', ha='center', va='bottom', fontsize=7.5, color='white')
-
-ax1.set_xticks(x + w)
-ax1.set_xticklabels(labels, color='white')
-ax1.set_ylim(0, 1.12)
-ax1.set_title('Métricas por Modelo', color='white', fontsize=13, pad=12)
-ax1.tick_params(colors='white')
+metricas = ['Acurácia', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC']
+valores  = [acc, prec, rec, f1, auc]
+bars = ax1.bar(metricas, valores, color='#f4a7b9', alpha=0.85, zorder=3)
+for bar, val in zip(bars, valores):
+    ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01,
+             f'{val:.2f}', ha='center', va='bottom', fontsize=8, color='white')
+ax1.set_ylim(0, 1.15)
+ax1.set_title('Métricas — Random Forest', color='white', fontsize=11, pad=10)
+ax1.tick_params(colors='white', labelsize=7)
 ax1.spines[:].set_color('#333')
 ax1.grid(axis='y', color='#333', linewidth=0.6, zorder=0)
-ax1.legend(facecolor='#1a1a1a', labelcolor='white', edgecolor='#444')
 
-# CV accuracy com desvio padrão
-ax2 = fig.add_subplot(gs[0, 2])
+# Matriz de confusão
+ax2 = fig.add_subplot(gs[0, 1])
 ax2.set_facecolor('#1a1a1a')
-cv_means = [resultados[n]['cv_mean'] for n in nomes]
-cv_stds  = [resultados[n]['cv_std']  for n in nomes]
-ax2.barh(nomes, cv_means, xerr=cv_stds, color=cores, alpha=0.85,
-         error_kw=dict(ecolor='white', lw=1.5, capsize=5), zorder=3)
-ax2.set_xlim(0.5, 1.0)
-ax2.set_title('CV Accuracy (10-fold ± std)', color='white', fontsize=11, pad=10)
+ax2.imshow(cm, cmap='Blues', vmin=0, vmax=cm.max())
+ax2.set_xticks([0, 1]); ax2.set_yticks([0, 1])
+ax2.set_xticklabels(['Sobreviveu', 'Faleceu'], color='white', fontsize=8)
+ax2.set_yticklabels(['Sobreviveu', 'Faleceu'], color='white', fontsize=8)
+ax2.set_xlabel('Previsto', color='white', fontsize=9)
+ax2.set_ylabel('Real',     color='white', fontsize=9)
+ax2.set_title('Matriz de Confusão', color='#f4a7b9', fontsize=11, pad=10)
 ax2.tick_params(colors='white')
 ax2.spines[:].set_color('#333')
-ax2.grid(axis='x', color='#333', linewidth=0.6, zorder=0)
-for i, (m, s) in enumerate(zip(cv_means, cv_stds)):
-    ax2.text(m + s + 0.003, i, f'{m:.3f}', va='center', color='white', fontsize=8.5)
+for r in range(2):
+    for c in range(2):
+        ax2.text(c, r, cm[r, c], ha='center', va='center',
+                 color='white', fontsize=14, fontweight='bold')
 
-# Matrizes de confusão
-for i, (nome, cor) in enumerate(zip(nomes, cores)):
-    ax = fig.add_subplot(gs[1, i])
-    ax.set_facecolor('#1a1a1a')
-    cm = resultados[nome]['cm']
-    ax.imshow(cm, cmap='Blues', vmin=0, vmax=cm.max())
-    ax.set_xticks([0, 1]); ax.set_yticks([0, 1])
-    ax.set_xticklabels(['Sobreviveu', 'Faleceu'], color='white', fontsize=8)
-    ax.set_yticklabels(['Sobreviveu', 'Faleceu'], color='white', fontsize=8)
-    ax.set_xlabel('Previsto', color='white', fontsize=9)
-    ax.set_ylabel('Real',     color='white', fontsize=9)
-    ax.set_title(f'Conf. Matrix — {nome}', color=cor, fontsize=9, pad=8)
-    ax.tick_params(colors='white')
-    ax.spines[:].set_color('#333')
-    for r in range(2):
-        for c in range(2):
-            ax.text(c, r, cm[r, c], ha='center', va='center',
-                    color='white', fontsize=13, fontweight='bold')
+# Curva ROC
+ax3 = fig.add_subplot(gs[0, 2])
+ax3.set_facecolor('#1a1a1a')
+RocCurveDisplay.from_predictions(
+    y_test, y_proba,
+    name=f"Random Forest (AUC={auc:.3f})",
+    ax=ax3, color='#f4a7b9'
+)
+ax3.plot([0, 1], [0, 1], 'w--', lw=0.8, label='Baseline')
+ax3.set_title('Curva ROC', color='white', fontsize=11, pad=10)
+ax3.tick_params(colors='white')
+ax3.spines[:].set_color('#444')
+ax3.xaxis.label.set_color('white')
+ax3.yaxis.label.set_color('white')
+ax3.legend(facecolor='#1a1a1a', labelcolor='white', edgecolor='#555', fontsize=8)
+ax3.grid(color='#333', linewidth=0.5)
 
-plt.suptitle('Heart Failure — Comparação de Classificadores',
-             color='white', fontsize=14, y=1.01)
-plt.savefig('comparacao_modelos_hf.png', dpi=150, bbox_inches='tight',
+plt.suptitle('Heart Failure — Random Forest', color='white', fontsize=13, y=1.02)
+plt.savefig('resultado_modelo_hf.png', dpi=150, bbox_inches='tight',
             facecolor=fig.get_facecolor())
 plt.show()
-print('\nGráfico salvo em: comparacao_modelos_hf.png')
-
-# Curvas ROC
-fig2, ax = plt.subplots(figsize=(7, 6))
-fig2.patch.set_facecolor('#0f0f0f')
-ax.set_facecolor('#1a1a1a')
-
-for nome, cor in zip(nomes, cores):
-    RocCurveDisplay.from_predictions(
-        y_test, resultados[nome]['y_proba'],
-        name=f"{nome} (AUC={resultados[nome]['roc_auc']:.3f})",
-        ax=ax, color=cor
-    )
-
-ax.plot([0, 1], [0, 1], 'w--', lw=0.8, label='Baseline')
-ax.set_title('Curvas ROC — Heart Failure', color='white', fontsize=13)
-ax.tick_params(colors='white')
-ax.spines[:].set_color('#444')
-ax.xaxis.label.set_color('white')
-ax.yaxis.label.set_color('white')
-ax.legend(facecolor='#1a1a1a', labelcolor='white', edgecolor='#555')
-ax.grid(color='#333', linewidth=0.5)
-
-plt.tight_layout()
-plt.savefig('curvas_roc_hf.png', dpi=150, bbox_inches='tight',
-            facecolor=fig2.get_facecolor())
-plt.show()
-print('Curvas ROC salvas em: curvas_roc_hf.png')
+print('\nGráfico salvo em: resultado_modelo_hf.png')
 
 
-# ============================================================
-# MÓDULO DE INFERÊNCIA
-# ============================================================
+# módulo de inferencia
 
 def inferir_paciente(
     age, anaemia, creatinine_phosphokinase, diabetes,
@@ -364,12 +238,11 @@ def inferir_paciente(
 ):
     """
     Recebe os dados de um paciente desconhecido e indica
-    a qual grupo ele pertence (Sobreviveu / Faleceu).
+    a qual grupo ele pertence (Sobreviveu / Risco de Óbito).
     """
     modelo_inf = load(open(modelo_path, 'rb'))
     scaler_inf = load(open(scaler_path, 'rb'))
 
-    # Monta o vetor na mesma ordem do treino
     dados = pd.DataFrame([{
         'age':                      age,
         'anaemia':                  anaemia,
@@ -385,10 +258,8 @@ def inferir_paciente(
         'time':                     time,
     }])
 
-    # Escalonar apenas as colunas contínuas
     dados[colunas_continuas] = scaler_inf.transform(dados[colunas_continuas])
 
-    # Predição
     classe       = modelo_inf.predict(dados)[0]
     distribuicao = modelo_inf.predict_proba(dados)[0]
     score        = distribuicao[1]
@@ -410,7 +281,6 @@ def exibir_resultado_inferencia(resultado, score, distribuicao):
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     fig.patch.set_facecolor('#0f0f0f')
 
-    # Barras de probabilidade
     ax = axes[0]
     ax.set_facecolor('#1a1a1a')
     classes    = ['Sobreviveu', 'Risco de Óbito']
@@ -426,7 +296,6 @@ def exibir_resultado_inferencia(resultado, score, distribuicao):
     ax.spines[:].set_color('#333')
     ax.grid(axis='y', color='#333', linewidth=0.6, zorder=0)
 
-    # Gauge de risco
     ax2 = axes[1]
     ax2.set_facecolor('#1a1a1a')
     cor_score = '#f4a7b9' if score >= 0.5 else '#c3e6cb'
@@ -454,9 +323,7 @@ def exibir_resultado_inferencia(resultado, score, distribuicao):
     print('\n  Gráfico salvo em: resultado_inferencia_hf.png')
 
 
-# ============================================================
-# EXEMPLO DE INFERÊNCIA — PACIENTE HIPOTÉTICO
-# ============================================================
+# apenas um exemplo de inferencia
 
 print("\n" + "=" * 60)
 print("  EXEMPLO DE INFERÊNCIA — PACIENTE HIPOTÉTICO")
@@ -464,17 +331,17 @@ print("=" * 60)
 
 resultado, score, distribuicao = inferir_paciente(
     age=65,
-    anaemia=1,                    # tem anemia
+    anaemia=1,
     creatinine_phosphokinase=250,
-    diabetes=1,                   # tem diabetes
-    ejection_fraction=30,         # baixa fração de ejeção (risco)
-    high_blood_pressure=1,        # pressão alta
+    diabetes=1,
+    ejection_fraction=30,
+    high_blood_pressure=1,
     platelets=200000,
-    serum_creatinine=1.8,         # levemente elevado
+    serum_creatinine=1.8,
     serum_sodium=135,
-    sex=1,                        # masculino
-    smoking=0,                    # não fuma
-    time=60,                      # 60 dias de acompanhamento
+    sex=1,
+    smoking=0,
+    time=60,
 )
 
 exibir_resultado_inferencia(resultado, score, distribuicao)
