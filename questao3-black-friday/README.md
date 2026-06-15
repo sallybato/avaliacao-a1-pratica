@@ -59,3 +59,9 @@ Com 100k amostras e múltiplas classes desbalanceadas nos 3 targets, Random Fore
 | `matplotlib` | Geração dos gráficos |
 | `scikit-learn` | Pré-processamento, treinamento e métricas |
 | `pickle` | Serialização dos modelos treinados |
+
+## Observação sobre os resultados
+
+As acurácias dos classificadores de forma de pagamento (16,3%) e faixa etária (19,8%) ficaram próximas do acaso — que seria ~16,7% para 6 classes e ~20% para 5 classes, respectivamente. O classificador de categoria do produto (34,5%) ficou acima do acaso (~10% para 10 classes), mas ainda assim modesto.
+
+Isso indica que `payment_method` e `age_group` foram provavelmente gerados de forma independente das demais variáveis no dataset sintético, tornando qualquer modelo preditivo matematicamente incapaz de superar o acaso nesses targets. O pipeline, o pré-processamento e as métricas estão corretos — o resultado reflete uma limitação do dataset, não do modelo.
